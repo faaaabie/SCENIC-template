@@ -1,0 +1,56 @@
+##Required packages
+require(SCENIC)
+require(AUCell)
+setwd("~")
+
+
+##ScenicOptions
+org="hgnc"
+dbDir="~/databases"
+myDatasetTitle="Title"
+scenicOptions <- initializeScenic(org = org, dbDir = dbDir, datasetTitle = myDatasetTitle, nCores = 20)
+scenicOptions@inputDatasetInfo$cellInfo <- "/exports/lkeb-hpc/flkick/pancreasall/int/cellInfo.Rds"
+scenicOptions@inputDatasetInfo$colVars <- "/exports/lkeb-hpc/flkick/pancreasall/int/colVars.Rds"
+saveRDS(scenicOptions, file="int/scenicOptions.Rds")
+
+
+##Genefiltering
+genesKept <- geneFiltering(exprMat, scenicOptions, minCountsPerGene = 5, minSamples = ncol(exprMat) * 0.01)
+exprMat_filtered <- exprMat[genesKept,]
+
+
+##Correlation
+runCorrelation(exprMat_filtered, scenicOptions)
+
+
+##Run SCENIC
+#possible normalisation/transformation
+#exprMat_filtered <- log(exprMat_filtered + 1)
+#exprMat <- log(exprMat + 1)
+runGenie3(exprMat_filtered, scenicOptions)
+
+scenicOptions@settings$verbose <- TRUE
+scenicOptions@settings$nCores <- 10
+scenicOptions@settings$seed <- 123
+runSCENIC_1_coexNetwork2modules(scenicOptions)
+runSCENIC_2_createRegulons(scenicOptions)
+runSCENIC_3_scoreCells(scenicOptions, exprMat)
+
+
+##Binarization
+setwd("~")
+require(SCENIC)
+exprMat <- readRDS("data/exprMat.Rds")
+scenicOptions <- readRDS("int/scenicOPtions.Rds")
+
+#possible normalisation/transformation
+#exprMat <- log(exprMat+1)
+aucellApp <- plotTsne_AUCellApp(scenicOptions, exprMat)
+savedSelections <- shiny::runApp(aucellApp)
+
+newThresholds <- savedSelections$thresholds
+scenicOptions@fileNames$int["aucell_thresholds",1] <- "int/newThresholds.Rds"
+saveRDS(newThresholds, file=getIntName(scenicOptions, "aucell_thresholds"))
+saveRDS(scenicOptions, file="int/scenicOptions.Rds")
+
+runSCENIC_4_aucell_binarize(scenicOptions)
