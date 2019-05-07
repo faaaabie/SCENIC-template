@@ -1,11 +1,19 @@
 ##Required packages
+if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
+if (!requireNamespace("SCENIC", quietly = TRUE)) devtools::install_github("aertslab/SCENIC")
 require(SCENIC)
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("AUCell")
 require(AUCell)
+if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
+#set required directory, make sure to create the directories 'data', 'databases', 'int' and 'ouput' in the working directory
 setwd("~")
 
 
 ##ScenicOptions
+#organism human, hgnc, for mice use mgi
 org="hgnc"
+#location of downloaded databases
 dbDir="~/databases"
 myDatasetTitle="Title"
 scenicOptions <- initializeScenic(org = org, dbDir = dbDir, datasetTitle = myDatasetTitle, nCores = 20)
@@ -13,6 +21,7 @@ saveRDS(scenicOptions, file="int/scenicOptions.Rds")
 
 
 ##Genefiltering
+#Select genes that are expressed in at least 1% of the cells and with a minimum count of 5.
 genesKept <- geneFiltering(exprMat, scenicOptions, minCountsPerGene = 5, minSamples = ncol(exprMat) * 0.01)
 exprMat_filtered <- exprMat[genesKept,]
 
@@ -27,23 +36,24 @@ runCorrelation(exprMat_filtered, scenicOptions)
 #exprMat <- log(exprMat + 1)
 runGenie3(exprMat_filtered, scenicOptions)
 
-scenicOptions@settings$verbose <- TRUE
+#Set number of cores used to 10
 scenicOptions@settings$nCores <- 10
-scenicOptions@settings$seed <- 123
 runSCENIC_1_coexNetwork2modules(scenicOptions)
 runSCENIC_2_createRegulons(scenicOptions)
 runSCENIC_3_scoreCells(scenicOptions, exprMat)
 
 
 ##Binarization
+#The previous steps could be run on a cluster in a submitted job, the next step can not be submitted as a job to a cluster so when in a new R session the wd has to be set and files loaded again.
 setwd("~")
 require(SCENIC)
 exprMat <- readRDS("data/exprMat.Rds")
 scenicOptions <- readRDS("int/scenicOPtions.Rds")
 
-#possible normalisation/transformation
+#Possible normalisation/transformation
 #exprMat <- log(exprMat+1)
 aucellApp <- plotTsne_AUCellApp(scenicOptions, exprMat)
+#Opens an app in which the thresholds can be changed manually or the cells can be selected
 savedSelections <- shiny::runApp(aucellApp)
 
 newThresholds <- savedSelections$thresholds
@@ -51,4 +61,5 @@ scenicOptions@fileNames$int["aucell_thresholds",1] <- "int/newThresholds.Rds"
 saveRDS(newThresholds, file=getIntName(scenicOptions, "aucell_thresholds"))
 saveRDS(scenicOptions, file="int/scenicOptions.Rds")
 
+#This last wrapper fucntion can be run submitted as a job to a cluster again, it will need the package SCENIC and the Rds file scenicOptions created in the previous step to be loaded
 runSCENIC_4_aucell_binarize(scenicOptions)
