@@ -9,8 +9,6 @@ org="hgnc"
 dbDir="~/databases"
 myDatasetTitle="Title"
 scenicOptions <- initializeScenic(org = org, dbDir = dbDir, datasetTitle = myDatasetTitle, nCores = 20)
-scenicOptions@inputDatasetInfo$cellInfo <- "/exports/lkeb-hpc/flkick/pancreasall/int/cellInfo.Rds"
-scenicOptions@inputDatasetInfo$colVars <- "/exports/lkeb-hpc/flkick/pancreasall/int/colVars.Rds"
 saveRDS(scenicOptions, file="int/scenicOptions.Rds")
 
 
